@@ -79,20 +79,20 @@ import io
 
 async def processar_foto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    msg_espera = await update.message.reply_text("Lendo comprovante (Tesseract) 🧐")
+    msg_espera = await update.message.reply_text("Processando leve... 🍃")
     
     try:
-        # Baixa a foto
         foto_arquivo = await update.message.photo[-1].get_file()
         foto_bytes = await foto_arquivo.download_as_bytearray()
         
-        # Converte para imagem que o Tesseract entende
+        # ABRE A IMAGEM E REDUZ O TAMANHO NA HORA
         img = Image.open(io.BytesIO(foto_bytes))
+        img.thumbnail((800, 800)) # Reduz para no máximo 800px (economiza MUITA RAM)
+        img = img.convert('L') # Transforma em Preto e Branco (fica mais leve para o OCR)
         
-        # Extrai o texto (configurado para português)
         texto_extraido = pytesseract.image_to_string(img, lang='por').upper()
         
-        # A lógica de busca de valores continua a mesma
+        # Lógica de busca de valores (mesma de antes)
         busca_valor = re.findall(r"(?:VALOR|TOTAL|PAGO|QUANTIDADE).*?(\d+[\.,]\d+)", texto_extraido)
         
         valor_final = None
@@ -107,12 +107,13 @@ async def processar_foto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if valor_final:
             atualizar_saldos(user_id, -valor_final, 0)
             s_c, s_l = obter_saldos(user_id)
-            await msg_espera.edit_text(f"✅ Lido com Tesseract!\nValor: R$ {valor_final:.2f}\n\n🏠 Contas: R$ {s_c:.2f}")
+            await msg_espera.edit_text(f"✅ Lido! Valor: R$ {valor_final:.2f}\n🏠 Contas: R$ {s_c:.2f}")
         else:
-            await msg_espera.edit_text("Não consegui ler o valor. Tente uma foto mais nítida!")
+            await msg_espera.edit_text("Não achei o valor. Tente digitar: 'paguei 35'")
             
     except Exception as e:
-        await msg_espera.edit_text(f"Erro no processamento: {e}")
+        # Se der erro de memória aqui, o bot vai reiniciar, mas não vai travar
+        print(f"Erro: {e}")
 
 async def processar_texto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id

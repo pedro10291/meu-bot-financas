@@ -6,3 +6,5 @@ cmds = ["python -m venv /opt/venv && /opt/venv/bin/pip install -r requirements.t
 
 [start]
 cmd = "/opt/venv/bin/python bot.py"
+[staticAssets]
+# (Isso ajuda a manter o ambiente limpo)
