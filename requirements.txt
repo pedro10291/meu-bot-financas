@@ -1,1 +1,5 @@
-pip freeze > requirements.txt
+python-telegram-bot
+easyocr
+python-dotenv
+opencv-python-headless
+torch --index-url https://download.pytorch.org/whl/cpu
