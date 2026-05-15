@@ -71,15 +71,28 @@ async def saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🍕 Lazer/Variável: R$ {s_l:.2f}"
     )
 
+import pytesseract  # Troque o import do easyocr por este
+from PIL import Image
+import io
+
+# No início do código, você não precisa mais da linha "reader = easyocr.Reader..."
+
 async def processar_foto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    msg_espera = await update.message.reply_text("Lendo comprovante... 🧐")
+    msg_espera = await update.message.reply_text("Lendo comprovante (Tesseract) 🧐")
+    
     try:
+        # Baixa a foto
         foto_arquivo = await update.message.photo[-1].get_file()
         foto_bytes = await foto_arquivo.download_as_bytearray()
-        resultados = reader.readtext(bytes(foto_bytes))
-        texto_extraido = " ".join([res[1].upper() for res in resultados])
         
+        # Converte para imagem que o Tesseract entende
+        img = Image.open(io.BytesIO(foto_bytes))
+        
+        # Extrai o texto (configurado para português)
+        texto_extraido = pytesseract.image_to_string(img, lang='por').upper()
+        
+        # A lógica de busca de valores continua a mesma
         busca_valor = re.findall(r"(?:VALOR|TOTAL|PAGO|QUANTIDADE).*?(\d+[\.,]\d+)", texto_extraido)
         
         valor_final = None
@@ -94,11 +107,12 @@ async def processar_foto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if valor_final:
             atualizar_saldos(user_id, -valor_final, 0)
             s_c, s_l = obter_saldos(user_id)
-            await msg_espera.edit_text(f"✅ Foto processada!\nValor: R$ {valor_final:.2f}\n\n🏠 Contas: R$ {s_c:.2f}")
+            await msg_espera.edit_text(f"✅ Lido com Tesseract!\nValor: R$ {valor_final:.2f}\n\n🏠 Contas: R$ {s_c:.2f}")
         else:
-            await msg_espera.edit_text("Valor não identificado na imagem.")
+            await msg_espera.edit_text("Não consegui ler o valor. Tente uma foto mais nítida!")
+            
     except Exception as e:
-        await msg_espera.edit_text(f"Erro: {e}")
+        await msg_espera.edit_text(f"Erro no processamento: {e}")
 
 async def processar_texto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id

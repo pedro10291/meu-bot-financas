@@ -1,5 +1,5 @@
 python-telegram-bot
-easyocr
+pytesseract
 python-dotenv
 opencv-python-headless
-torch --index-url https://download.pytorch.org/whl/cpu
+Pillow
