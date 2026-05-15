@@ -1,10 +1,21 @@
 import sqlite3
 import re
 import os
+import threading
+import http.server
+import socketserver
 from datetime import datetime
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+
+# --- CONFIGURAÇÃO PARA O RENDER (NÃO MEXER) ---
+def run_health_check_server():
+    port = int(os.environ.get("PORT", 10000))
+    handler = http.server.SimpleHTTPRequestHandler
+    # Isso abre uma "porta" para o Render não derrubar o bot
+    with socketserver.TCPServer(("", port), handler) as httpd:
+        httpd.serve_forever()
 
 load_dotenv()
 TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -54,10 +65,10 @@ def obter_saldos(user_id):
     conn.close()
     return res if res else (0, 0)
 
-# --- COMANDOS ---
+# --- COMANDOS DO TELEGRAM ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🚀 **Controle Financeiro Ativo!**\n\nMande um valor e uma descrição (ex: 50 lanche) e escolha a categoria nos botões.")
+    await update.message.reply_text("🚀 **Bot Financeiro Online!**\n\nMande um valor e uma descrição (ex: 50 lanche) e escolha a categoria.")
 
 async def saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -72,7 +83,7 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cursor.execute('DELETE FROM transacoes WHERE user_id = ?', (user_id,))
     conn.commit()
     conn.close()
-    await update.message.reply_text("🔄 **Banco de dados resetado com sucesso!**")
+    await update.message.reply_text("🔄 **Banco de dados resetado!**")
 
 async def extrato(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -91,7 +102,7 @@ async def extrato(update: Update, context: ContextTypes.DEFAULT_TYPE):
         res += f"{r[0][8:10]}/{r[0][5:7]} | {emoji} R$ {r[2]:.2f} - {r[3]}\n"
     await update.message.reply_text(res)
 
-# --- INTERAÇÃO ---
+# --- LÓGICA DE INTERAÇÃO ---
 
 async def processar_texto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = update.message.text
@@ -99,9 +110,8 @@ async def processar_texto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not numeros: return
     
     valor = float(numeros[0])
-    # Tenta isolar a descrição
     desc = texto.replace(str(numeros[0]).replace('.', ','), "").replace(str(numeros[0]), "").strip() or "Gasto"
-    desc_c = desc[:15] # Limite para o botão
+    desc_c = desc[:15]
 
     keyboard = [
         [
@@ -132,13 +142,19 @@ async def tratar_botao(update: Update, context: ContextTypes.DEFAULT_TYPE):
         v_c, v_l = valor * 0.7, valor * 0.3
         atualizar_saldos(user_id, v_c, v_l)
         registrar_transacao(user_id, "gan", valor, desc)
-        txt = f"✅ **{desc.upper()}**: +R$ {valor:.2f} (Dividido)"
+        txt = f"✅ **{desc.upper()}**: +R$ {valor:.2f}"
 
     s_c, s_l = obter_saldos(user_id)
     await query.edit_message_text(f"{txt}\n\n📊 **SALDOS:**\n🏠 Contas: R$ {s_c:.2f}\n🍕 Lazer: R$ {s_l:.2f}")
 
+# --- EXECUÇÃO ---
+
 if __name__ == '__main__':
     iniciar_db()
+    
+    # Inicia o servidor de "saúde" para o Render não derrubar o bot
+    threading.Thread(target=run_health_check_server, daemon=True).start()
+    
     app = ApplicationBuilder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
@@ -148,5 +164,5 @@ if __name__ == '__main__':
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), processar_texto))
     app.add_handler(CallbackQueryHandler(tratar_botao))
     
-    print("Bot atualizado rodando! 🚀")
+    print("Bot rodando com Health Check! 🚀")
     app.run_polling()
