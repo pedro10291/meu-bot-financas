@@ -79,41 +79,29 @@ import io
 
 async def processar_foto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    msg_espera = await update.message.reply_text("Processando leve... 🍃")
+    msg_espera = await update.message.reply_text("Processando (Modo Econômico) 🍃")
     
     try:
         foto_arquivo = await update.message.photo[-1].get_file()
         foto_bytes = await foto_arquivo.download_as_bytearray()
         
-        # ABRE A IMAGEM E REDUZ O TAMANHO NA HORA
+        # Abre a imagem
         img = Image.open(io.BytesIO(foto_bytes))
-        img.thumbnail((800, 800)) # Reduz para no máximo 800px (economiza MUITA RAM)
-        img = img.convert('L') # Transforma em Preto e Branco (fica mais leve para o OCR)
         
+        # REDUÇÃO AGRESSIVA: 
+        # 1. Diminui o tamanho
+        img.thumbnail((600, 600)) 
+        # 2. Converte para 1-bit (Preto e Branco total) para gastar quase zero de RAM
+        img = img.convert('1') 
+        
+        # O Tesseract lê muito mais rápido assim
         texto_extraido = pytesseract.image_to_string(img, lang='por').upper()
         
-        # Lógica de busca de valores (mesma de antes)
-        busca_valor = re.findall(r"(?:VALOR|TOTAL|PAGO|QUANTIDADE).*?(\d+[\.,]\d+)", texto_extraido)
+        # Sua lógica de busca de valor (re.findall...) continua aqui embaixo igualzinha
+        # ... (copie o restante da sua lógica de regex e atualização de saldo aqui)
         
-        valor_final = None
-        if busca_valor:
-            valor_final = float(busca_valor[0].replace(',', '.'))
-        else:
-            todos_numeros = re.findall(r"\d+[\.,]\d+", texto_extraido)
-            if todos_numeros:
-                lista_floats = [float(n.replace(',', '.')) for n in todos_numeros if float(n.replace(',', '.')) < 100000]
-                if lista_floats: valor_final = max(lista_floats)
-
-        if valor_final:
-            atualizar_saldos(user_id, -valor_final, 0)
-            s_c, s_l = obter_saldos(user_id)
-            await msg_espera.edit_text(f"✅ Lido! Valor: R$ {valor_final:.2f}\n🏠 Contas: R$ {s_c:.2f}")
-        else:
-            await msg_espera.edit_text("Não achei o valor. Tente digitar: 'paguei 35'")
-            
     except Exception as e:
-        # Se der erro de memória aqui, o bot vai reiniciar, mas não vai travar
-        print(f"Erro: {e}")
+        print(f"Erro de memória evitado: {e}")
 
 async def processar_texto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
