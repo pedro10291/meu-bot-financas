@@ -1,0 +1,13 @@
+# Segurança: Não subir o token e chaves
+.env
+
+# Banco de dados local (cada servidor terá o seu)
+*.db
+
+# Pastas temporárias do Python e do EasyOCR
+__pycache__/
+.cache/
+model/
+
+# Pastas do VS Code
+.vscode/
